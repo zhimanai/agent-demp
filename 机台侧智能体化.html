@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS-E320 Dry Etch System - HMI v4.2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#1a1a1a;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ============================
+     HMI MAIN INTERFACE (old industrial style)
+  ============================ */
+  #hmi-root {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #c0c0c0;
+    border: 3px solid #808080;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Title bar */
+  #title-bar {
+    background: #000080;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #0000ff;
+  }
+  #title-bar .win-buttons { display:flex; gap:2px; }
+  #title-bar .win-btn {
+    width:14px; height:14px; background:#c0c0c0;
+    border:2px solid; border-color:#ffffff #808080 #808080 #ffffff;
+    font-size:9px; font-weight:bold; color:#000;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+
+  /* Menu bar */
+  #menu-bar {
+    background:#c0c0c0;
+    border-bottom: 2px solid #808080;
+    padding: 1px 0;
+    display:flex;
+    align-items:center;
+  }
+  .menu-item {
+    padding: 1px 8px;
+    font-size:11px;
+    cursor:pointer;
+    color:#000;
+  }
+  .menu-item:hover { background:#000080; color:#fff; }
+
+  /* Status toolbar */
+  #status-toolbar {
+    background:#c0c0c0;
+    border-bottom: 2px solid #808080;
+    padding: 2px 4px;
+    display:flex; gap:8px; align-items:center;
+  }
+  .toolbar-btn {
+    padding: 2px 8px;
+    background: #c0c0c0;
+    border: 2px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    color:#000;
+  }
+  .toolbar-btn:active {
+    border-color: #808080 #ffffff #ffffff #808080;
+  }
+  .toolbar-btn.red { background:#ff0000; color:#fff; font-weight:bold; }
+  .toolbar-btn.green { background:#008000; color:#fff; font-weight:bold; }
+  .toolbar-btn.yellow { background:#ffff00; color:#000; font-weight:bold; }
+  .toolbar-separator { width:2px; background:#808080; height:18px; }
+
+  /* Main content area */
+  #main-content {
+    flex:1;
+    display:flex;
+    overflow:hidden;
+  }
+
+  /* Left panel - process diagram */
+  #left-panel {
+    width: 260px;
+    background:#c0c0c0;
+    border-right: 3px solid #808080;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .panel-title {
+    background:#000080;
+    color:#fff;
+    font-size:10px;
+    font-weight:bold;
+    padding:2px 4px;
+    text-align:center;
+    border-bottom:2px solid #0000ff;
+  }
+
+  /* Process diagram canvas area */
+  #process-diagram {
+    flex:1;
+    background:#000;
+    position:relative;
+    padding:8px;
+    overflow:hidden;
+  }
+  .pipe {
+    position:absolute;
+    background:#00ffff;
+  }
+  .pipe.h { height:4px; }
+  .pipe.v { width:4px; }
+  .valve-box {
+    position:absolute;
+    background:#ff8c00;
+    border:2px solid #ffff00;
+    color:#000;
+    font-size:8px;
+    font-weight:bold;
+    padding:1px 3px;
+    text-align:center;
+    cursor:pointer;
+  }
+  .valve-box.open { background:#00ff00; border-color:#00ff00; }
+  .valve-box.closed { background:#ff0000; border-color:#ff0000; }
+  .chamber-box {
+    position:absolute;
+    background:#333;
+    border:3px solid #00ffff;
+    color:#00ffff;
+    font-size:9px;
+    font-weight:bold;
+    text-align:center;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .pump-box {
+    position:absolute;
+    background:#660066;
+    border:2px solid #ff00ff;
+    color:#ff00ff;
+    font-size:8px;
+    font-weight:bold;
+    text-align:center;
+    padding:2px;
+  }
+  .sensor-dot {
+    position:absolute;
+    width:10px; height:10px;
+    border-radius:50%;
+    border:1px solid #fff;
+  }
+
+  /* Center panel */
+  #center-panel {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* Tab bar */
+  #tab-bar {
+    background:#c0c0c0;
+    border-bottom:2px solid #808080;
+    display:flex;
+    padding-top:2px;
+  }
+  .tab {
+    padding:2px 10px;
+    font-size:10px;
+    border:2px solid;
+    border-color:#ffffff #808080 #c0c0c0 #ffffff;
+    background:#c0c0c0;
+    cursor:pointer;
+    margin-right:2px;
+    position:relative;
+    top:2px;
+    color:#000;
+  }
+  .tab.active {
+    background:#c0c0c0;
+    border-color:#ffffff #808080 #c0c0c0 #ffffff;
+    border-bottom-color:#c0c0c0;
+    font-weight:bold;
+    z-index:1;
+  }
+
+  /* Process params table */
+  #params-area {
+    flex:1;
+    overflow:auto;
+    padding:4px;
+    background:#c0c0c0;
+  }
+  .params-table {
+    width:100%;
+    border-collapse:collapse;
+    font-size:10px;
+  }
+  .params-table th {
+    background:#000080;
+    color:#fff;
+    padding:2px 4px;
+    border:1px solid #808080;
+    text-align:left;
+    font-size:10px;
+  }
+  .params-table td {
+    padding:1px 4px;
+    border:1px solid #808080;
+    font-size:10px;
+    color:#000;
+  }
+  .params-table tr:nth-child(even) { background:#d4d0c8; }
+  .params-table tr:nth-child(odd) { background:#c0c0c0; }
+  .val-ok { color:#008000; font-weight:bold; }
+  .val-warn { color:#ff8c00; font-weight:bold; }
+  .val-err { color:#ff0000; font-weight:bold; }
+  .val-sp { color:#000080; }
+
+  .input-cell {
+    background:#fff;
+    border:2px inset #808080;
+    padding:1px 3px;
+    font-family:'Courier New', monospace;
+    font-size:10px;
+    width:70px;
+    color:#000;
+  }
+
+  /* Process log */
+  #log-area {
+    height:120px;
+    border-top:3px solid #808080;
+    background:#000;
+    overflow-y:auto;
+    padding:4px;
+    font-size:10px;
+    color:#00ff00;
+    font-family:'Courier New', monospace;
+  }
+  .log-entry { line-height:14px; }
+  .log-err { color:#ff4444; }
+  .log-warn { color:#ffaa00; }
+  .log-info { color:#00ff00; }
+
+  /* Right panel - status */
+  #right-panel {
+    width:200px;
+    background:#c0c0c0;
+    border-left:3px solid #808080;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  .status-section {
+    border-bottom:2px solid #808080;
+    padding:4px;
+  }
+  .status-label {
+    font-size:9px;
+    color:#000;
+    font-weight:bold;
+    margin-bottom:2px;
+    background:#808080;
+    color:#fff;
+    padding:1px 3px;
+  }
+  .led-row {
+    display:flex;
+    align-items:center;
+    gap:4px;
+    font-size:10px;
+    margin:1px 0;
+    color:#000;
+  }
+  .led {
+    width:10px; height:10px;
+    border-radius:50%;
+    border:1px solid #333;
+    flex-shrink:0;
+  }
+  .led.green { background:#00cc00; box-shadow:0 0 4px #00ff00; }
+  .led.red { background:#cc0000; box-shadow:0 0 4px #ff0000; }
+  .led.yellow { background:#cccc00; box-shadow:0 0 4px #ffff00; animation:blink 0.8s step-end infinite; }
+  .led.off { background:#333; box-shadow:none; }
+  .led.blue { background:#0066cc; box-shadow:0 0 4px #0088ff; }
+
+  @keyframes blink { 50%{opacity:0;} }
+
+  /* Action buttons in right panel */
+  .action-btn {
+    display:block;
+    width:100%;
+    margin:2px 0;
+    padding:3px 6px;
+    font-size:10px;
+    font-family:'Courier New', monospace;
+    font-weight:bold;
+    border:2px solid;
+    border-color:#ffffff #808080 #808080 #ffffff;
+    background:#c0c0c0;
+    cursor:pointer;
+    text-align:left;
+    color:#000;
+  }
+  .action-btn:active { border-color:#808080 #ffffff #ffffff #808080; }
+  .action-btn.danger { background:#ff0000; color:#fff; border-color:#ff8888 #880000 #880000 #ff8888; }
+  .action-btn.primary { background:#000080; color:#fff; border-color:#4444ff #000033 #000033 #4444ff; }
+  .action-btn.success { background:#006600; color:#fff; border-color:#00aa00 #003300 #003300 #00aa00; }
+
+  /* Bottom status bar */
+  #status-bar {
+    background:#c0c0c0;
+    border-top:2px solid #ffffff;
+    padding:2px 4px;
+    display:flex;
+    gap:8px;
+    font-size:10px;
+    color:#000;
+  }
+  .status-cell {
+    padding:1px 6px;
+    border:2px inset #808080;
+    background:#c0c0c0;
+    min-width:80px;
+  }
+
+  /* ============================
+     ALARM POPUP
+  ============================ */
+  #alarm-popup {
+    display:none;
+    position:fixed;
+    top:50%; left:50%;
+    transform: translate(-50%, -50%);
+    z-index:900;
+    background:#c0c0c0;
+    border:3px solid;
+    border-color:#ffffff #808080 #808080 #ffffff;
+    box-shadow: 4px 4px 0 #000;
+    width:480px;
+    font-family:'Courier New', monospace;
+  }
+  #alarm-popup.show { display:block; }
+  .alarm-title-bar {
+    background:#c00000;
+    color:#fff;
+    font-size:11px;
+    font-weight:bold;
+    padding:3px 6px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .alarm-body {
+    padding:12px;
+  }
+  .alarm-code-row {
+    background:#ff0000;
+    color:#ffff00;
+    font-size:14px;
+    font-weight:bold;
+    padding:6px 10px;
+    margin-bottom:8px;
+    border:2px inset #808080;
+    text-align:center;
+    letter-spacing:2px;
+  }
+  .alarm-info {
+    font-size:10px;
+    color:#000;
+    line-height:16px;
+    margin-bottom:8px;
+    background:#fff;
+    padding:4px;
+    border:2px inset #808080;
+  }
+  .alarm-btn-row {
+    display:flex;
+    gap:6px;
+    margin-top:8px;
+  }
+  .alarm-btn {
+    flex:1;
+    padding:4px;
+    font-size:10px;
+    font-family:'Courier New', monospace;
+    font-weight:bold;
+    border:2px solid;
+    border-color:#ffffff #808080 #808080 #ffffff;
+    background:#c0c0c0;
+    cursor:pointer;
+    color:#000;
+  }
+  .alarm-btn.ai-assist {
+    background:#38C793;
+    color:#111625;
+    border-color:#88ffcc #1a8a5a #1a8a5a #88ffcc;
+    font-size:10px;
+  }
+
+  /* ============================
+     AGENT FAB BUTTON
+  ============================ */
+  #agent-fab {
+    position: fixed;
+    bottom: 28px;
+    right: 24px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #38C793, #1a8a5a);
+    border: none;
+    cursor: pointer;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(56,199,147,0.4), 0 0 0 0 rgba(56,199,147,0.4);
+    animation: pulse-fab 2.5s ease-in-out infinite;
+    transition: transform 0.15s;
+  }
+  #agent-fab:hover { transform: scale(1.1); }
+  #agent-fab.alarm-flash { animation: alarm-pulse 0.5s ease-in-out infinite; }
+  @keyframes pulse-fab {
+    0%,100% { box-shadow: 0 4px 16px rgba(56,199,147,0.4), 0 0 0 0 rgba(56,199,147,0.4); }
+    50% { box-shadow: 0 4px 16px rgba(56,199,147,0.6), 0 0 0 10px rgba(56,199,147,0.0); }
+  }
+  @keyframes alarm-pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,60,60,0.8); background: linear-gradient(135deg, #ff4444, #cc0000); }
+    50% { box-shadow: 0 0 0 14px rgba(255,60,60,0); background: linear-gradient(135deg, #ff6666, #ff0000); }
+  }
+  #agent-fab svg { width:26px; height:26px; }
+  #fab-badge {
+    display:none;
+    position:absolute;
+    top:-4px; right:-4px;
+    width:16px; height:16px;
+    background:#ff4444;
+    border-radius:50%;
+    font-size:9px;
+    color:#fff;
+    font-family:sans-serif;
+    font-weight:bold;
+    align-items:center;
+    justify-content:center;
+  }
+
+  /* ============================
+     AGENT CHAT PANEL
+  ============================ */
+  #agent-panel {
+    display:none;
+    position:fixed;
+    bottom:90px; right:20px;
+    width:400px;
+    height:580px;
+    z-index:999;
+    border-radius:16px;
+    overflow:hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(56,199,147,0.2);
+    flex-direction:column;
+    background:#111625;
+    font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+  #agent-panel.show { display:flex; }
+
+  /* Panel header */
+  #panel-header {
+    background: linear-gradient(135deg, #111625, #1a2235);
+    padding: 14px 16px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    border-bottom: 1px solid rgba(56,199,147,0.2);
+    flex-shrink:0;
+  }
+  #panel-header .agent-avatar {
+    width:36px; height:36px;
+    border-radius:50%;
+    background:linear-gradient(135deg, #38C793, #1a6640);
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:bold; color:#fff;
+    flex-shrink:0;
+    border:2px solid #38C793;
+  }
+  #panel-header .agent-info { flex:1; }
+  #panel-header .agent-name { color:#fff; font-size:14px; font-weight:600; }
+  #panel-header .agent-status {
+    font-size:11px; color:#38C793; display:flex; align-items:center; gap:4px;
+  }
+  #panel-header .agent-status::before {
+    content:''; width:6px; height:6px; border-radius:50%;
+    background:#38C793; display:inline-block;
+  }
+  #panel-header .close-btn {
+    width:28px; height:28px; border-radius:50%;
+    background:rgba(255,255,255,0.1);
+    border:none; cursor:pointer; color:#aaa; font-size:14px;
+    display:flex; align-items:center; justify-content:center;
+    transition:background 0.2s;
+  }
+  #panel-header .close-btn:hover { background:rgba(255,255,255,0.2); color:#fff; }
+
+  /* Messages container */
+  #messages {
+    flex:1;
+    overflow-y:auto;
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    scroll-behavior: smooth;
+  }
+  #messages::-webkit-scrollbar { width:4px; }
+  #messages::-webkit-scrollbar-track { background:transparent; }
+  #messages::-webkit-scrollbar-thumb { background:rgba(56,199,147,0.3); border-radius:2px; }
+
+  /* Message row */
+  .msg-row {
+    display:flex;
+    gap:8px;
+    align-items:flex-start;
+  }
+  .msg-row.user { flex-direction:row-reverse; }
+  .msg-avatar {
+    width:30px; height:30px; border-radius:50%;
+    flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:bold; color:#fff;
+  }
+  .msg-avatar.agent { background:linear-gradient(135deg,#38C793,#1a6640); border:1.5px solid #38C793; }
+  .msg-avatar.user-av { background:linear-gradient(135deg,#4a6fa5,#2d4a7a); }
+
+  .msg-content { flex:1; max-width:85%; }
+  .msg-meta { font-size:10px; color:#666; margin-bottom:3px; }
+  .msg-row.user .msg-meta { text-align:right; }
+
+  .msg-bubble {
+    padding:8px 11px;
+    border-radius:12px;
+    font-size:12.5px;
+    line-height:1.55;
+    word-break:break-word;
+  }
+  .msg-bubble.agent-bubble {
+    background:#1e2d3d;
+    color:#d0e8ff;
+    border:1px solid rgba(56,199,147,0.15);
+    border-radius:2px 12px 12px 12px;
+  }
+  .msg-bubble.user-bubble {
+    background:linear-gradient(135deg, #38C793, #2ea876);
+    color:#fff;
+    border-radius:12px 2px 12px 12px;
+  }
+  .msg-bubble.system-bubble {
+    background:rgba(56,199,147,0.08);
+    border:1px solid rgba(56,199,147,0.25);
+    border-radius:8px;
+    color:#38C793;
+    font-size:11px;
+    text-align:center;
+  }
+  .msg-bubble.think-bubble {
+    background:#1a1f2e;
+    border:1px solid rgba(180,160,255,0.25);
+    border-radius:8px;
+    color:#9b8dcc;
+    font-size:11px;
+    font-style:italic;
+  }
+  .msg-bubble.action-bubble {
+    background:#0d1f0d;
+    border:1px solid rgba(56,199,147,0.3);
+    border-radius:8px;
+    color:#5dde9a;
+    font-size:11px;
+    font-family:'Courier New', monospace;
+  }
+  .msg-bubble.screenshot-bubble {
+    background:#0a0a0a;
+    border:1px solid #38C793;
+    border-radius:8px;
+    padding:6px;
+    overflow:hidden;
+  }
+  .msg-bubble.screenshot-bubble img {
+    width:100%; border-radius:4px; display:block;
+  }
+  .screenshot-label {
+    font-size:10px; color:#38C793; margin-top:4px; text-align:center;
+    font-family:'Courier New', monospace;
+  }
+
+  /* Think toggle */
+  .think-header {
+    display:flex; align-items:center; gap:4px;
+    cursor:pointer; user-select:none;
+    color:#9b8dcc; font-size:11px;
+  }
+  .think-toggle { color:#9b8dcc; }
+  .think-body { margin-top:4px; display:none; }
+  .think-body.open { display:block; }
+
+  /* Confirm button */
+  .confirm-btn {
+    margin-top:8px;
+    padding:8px 16px;
+    background:linear-gradient(135deg, #38C793, #2ea876);
+    border:none; border-radius:8px;
+    color:#fff; font-size:12px; font-weight:600;
+    cursor:pointer; width:100%;
+    font-family:inherit;
+    transition: opacity 0.2s;
+  }
+  .confirm-btn:hover { opacity:0.9; }
+  .confirm-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+  /* Step list */
+  .step-list { list-style:none; padding:0; margin:4px 0; }
+  .step-list li {
+    padding:3px 0;
+    font-size:11.5px;
+    display:flex; gap:6px; align-items:flex-start;
+    color:#c8ddf0;
+  }
+  .step-num {
+    width:16px; height:16px; border-radius:50%;
+    background:#38C793; color:#000;
+    font-size:9px; font-weight:bold;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; margin-top:1px;
+  }
+
+  /* Input area */
+  #input-area {
+    border-top:1px solid rgba(56,199,147,0.15);
+    padding:10px 12px;
+    display:flex;
+    gap:8px;
+    align-items:center;
+    background:#0e1520;
+    flex-shrink:0;
+  }
+  #chat-input {
+    flex:1;
+    background:#1a2235;
+    border:1px solid rgba(56,199,147,0.2);
+    border-radius:20px;
+    padding:8px 14px;
+    font-size:12px;
+    color:#d0e8ff;
+    font-family:inherit;
+    outline:none;
+    transition:border-color 0.2s;
+  }
+  #chat-input:focus { border-color:#38C793; }
+  #chat-input::placeholder { color:#4a5a6a; }
+  #send-btn {
+    width:34px; height:34px; border-radius:50%;
+    background:linear-gradient(135deg, #38C793, #2ea876);
+    border:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+    transition:transform 0.15s;
+  }
+  #send-btn:hover { transform:scale(1.1); }
+  #send-btn svg { width:16px; height:16px; }
+
+  /* Typing indicator */
+  .typing-indicator {
+    display:flex; gap:4px; padding:6px 10px;
+    align-items:center;
+  }
+  .typing-dot {
+    width:6px; height:6px; border-radius:50%;
+    background:#38C793;
+    animation:typing 1.2s ease-in-out infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay:0.2s; }
+  .typing-dot:nth-child(3) { animation-delay:0.4s; }
+  @keyframes typing {
+    0%,60%,100%{ transform:translateY(0); opacity:0.4; }
+    30%{ transform:translateY(-4px); opacity:1; }
+  }
+
+  /* Overlay */
+  #overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:895; }
+  #overlay.show { display:block; }
+
+  /* Running indicator */
+  .running-line {
+    height:2px;
+    background: linear-gradient(90deg, transparent, #38C793, transparent);
+    background-size:200% 100%;
+    animation: running 1.5s linear infinite;
+  }
+  @keyframes running {
+    0%{ background-position: 200% 0; }
+    100%{ background-position: -200% 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===========================
+     HMI MAIN INTERFACE
+=========================== -->
+<div id="hmi-root">
+
+  <!-- Title bar -->
+  <div id="title-bar">
+    <span>⚙ NEXUS-E320 Dry Etch System &nbsp;|&nbsp; HMI v4.2.1 &nbsp;|&nbsp; Operator: LIN_JH</span>
+    <div class="win-buttons">
+      <div class="win-btn">_</div>
+      <div class="win-btn">□</div>
+      <div class="win-btn" style="background:#cc0000;color:#fff;">✕</div>
+    </div>
+  </div>
+
+  <!-- Menu bar -->
+  <div id="menu-bar">
+    <div class="menu-item">File</div>
+    <div class="menu-item">Process</div>
+    <div class="menu-item">Diagnostics</div>
+    <div class="menu-item">Maintenance</div>
+    <div class="menu-item">Data</div>
+    <div class="menu-item">Alarm</div>
+    <div class="menu-item">Help</div>
+  </div>
+
+  <!-- Toolbar -->
+  <div id="status-toolbar">
+    <button class="toolbar-btn green">▶ START</button>
+    <button class="toolbar-btn">⏸ PAUSE</button>
+    <button class="toolbar-btn danger" id="abort-btn">■ ABORT PROCESS</button>
+    <div class="toolbar-separator"></div>
+    <button class="toolbar-btn">RECIPE LOAD</button>
+    <button class="toolbar-btn">WAFER MAP</button>
+    <button class="toolbar-btn">CALIBRATE</button>
+    <div style="flex:1;"></div>
+    <span style="font-size:10px;color:#000;">
+      <span id="clock"></span> &nbsp;|&nbsp; RECIPE: CF4_SiO2_HDP_v3 &nbsp;|&nbsp; LOT: N22AETX0421
+    </span>
+  </div>
+
+  <!-- Main content -->
+  <div id="main-content">
+
+    <!-- Left panel: process diagram -->
+    <div id="left-panel">
+      <div class="panel-title">PROCESS DIAGRAM — NEXUS-E320</div>
+      <div id="process-diagram">
+        <!-- Chamber -->
+        <div class="chamber-box" id="chamber-box" style="left:80px;top:60px;width:100px;height:70px;">
+          PROCESS<br>CHAMBER<br><span id="chamber-status" style="font-size:7px;color:#ffff00;">STANDBY</span>
+        </div>
+        <!-- Pumps -->
+        <div class="pump-box" id="tmp-pump-box" style="left:20px;top:200px;width:60px;height:30px;">TMP-1<br>PUMP</div>
+        <div class="pump-box" style="left:180px;top:200px;width:60px;height:30px;">DRY<br>PUMP</div>
+        <!-- Valves -->
+        <div class="valve-box open" id="v1-box" style="left:95px;top:140px;width:30px;">V1<br>OPEN</div>
+        <div class="valve-box closed" id="v2-box" style="left:145px;top:140px;width:30px;">V2<br>CLSD</div>
+        <div class="valve-box open" id="v3-box" style="left:35px;top:175px;width:30px;">V3<br>OPEN</div>
+        <div class="valve-box open" id="v4-box" style="left:190px;top:175px;width:30px;">V4<br>OPEN</div>
+        <!-- Gas lines -->
+        <div class="valve-box" id="mfc-cf4" style="left:30px;top:20px;width:35px;background:#0044ff;border-color:#4488ff;color:#fff;">CF4<br>MFC</div>
+        <div class="valve-box" id="mfc-o2" style="left:80px;top:20px;width:35px;background:#004400;border-color:#00aa00;color:#00ff00;">O2<br>MFC</div>
+        <div class="valve-box" id="mfc-ar" style="left:130px;top:20px;width:35px;background:#440044;border-color:#aa00aa;color:#ff44ff;">Ar<br>MFC</div>
+        <div class="valve-box" style="left:180px;top:20px;width:35px;background:#444400;border-color:#aaaa00;color:#ffff00;">N2<br>MFC</div>
+        <!-- Pipes vertical -->
+        <div class="pipe v" style="left:47px;top:45px;height:16px;background:#0088ff;"></div>
+        <div class="pipe v" style="left:97px;top:45px;height:16px;background:#00cc00;"></div>
+        <div class="pipe v" style="left:147px;top:45px;height:16px;background:#cc44cc;"></div>
+        <div class="pipe v" style="left:197px;top:45px;height:16px;background:#cccc00;"></div>
+        <!-- Pipe horizontal gas manifold -->
+        <div class="pipe h" id="gas-manifold" style="left:47px;top:58px;width:152px;background:#00ffff;"></div>
+        <!-- Pipe to chamber -->
+        <div class="pipe v" style="left:129px;top:58px;height:4px;background:#00ffff;"></div>
+        <!-- Pipe chamber to pumps -->
+        <div class="pipe v" id="pump-pipe-main" style="left:129px;top:130px;height:16px;background:#00ffff;"></div>
+        <div class="pipe h" id="pump-pipe-h" style="left:50px;top:192px;width:80px;background:#ff00ff;"></div>
+        <div class="pipe v" style="left:50px;top:140px;height:52px;background:#ff00ff;"></div>
+        <div class="pipe v" style="left:210px;top:140px;height:52px;background:#ff00ff;"></div>
+        <!-- Sensors -->
+        <div class="sensor-dot" id="sensor-press" style="left:75px;top:95px;background:#ff8800;" title="Pressure Gauge"></div>
+        <div class="sensor-dot" id="sensor-temp" style="left:185px;top:95px;background:#00ff88;" title="Temperature Sensor"></div>
+        <!-- Labels -->
+        <div style="position:absolute;left:2px;top:240px;font-size:8px;color:#888;line-height:14px;">
+          CHAMBER PRESS: <span id="diag-press" style="color:#00ffff;">2.4e-3 Torr</span><br>
+          FORELINE: <span id="diag-fore" style="color:#00ffff;">3.8 Torr</span><br>
+          RF PWR: <span id="diag-rf" style="color:#ff8800;">450 W</span><br>
+          ESC TEMP: <span id="diag-esc" style="color:#00ff88;">20.1 °C</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center panel -->
+    <div id="center-panel">
+
+      <!-- Tabs -->
+      <div id="tab-bar">
+        <div class="tab active">PROCESS PARAMETERS</div>
+        <div class="tab">RECIPE EDITOR</div>
+        <div class="tab">ALARM HISTORY</div>
+        <div class="tab">TRENDING</div>
+        <div class="tab">WAFER INFO</div>
+      </div>
+
+      <!-- Params table -->
+      <div id="params-area">
+        <div style="display:flex;gap:4px;margin-bottom:4px;">
+          <span style="font-size:10px;font-weight:bold;color:#000;">PROCESS STEP: 3 / 7 &nbsp;&nbsp;</span>
+          <span style="font-size:10px;color:#000080;font-weight:bold;">CF4 MAIN ETCH &nbsp;&nbsp;</span>
+          <span style="font-size:10px;color:#008800;font-weight:bold;">■ RUNNING &nbsp;&nbsp;</span>
+          <span style="font-size:10px;color:#000;">Time: <span id="step-time">00:00:00</span> / 00:05:00</span>
+        </div>
+
+        <table class="params-table">
+          <thead>
+            <tr>
+              <th>PARAMETER</th>
+              <th>SETPOINT (SP)</th>
+              <th>PROCESS VALUE (PV)</th>
+              <th>UNIT</th>
+              <th>STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>RF Power (13.56 MHz)</td><td class="val-sp"><input class="input-cell" id="sp-rf" value="450"></td><td class="val-ok" id="pv-rf">449.2</td><td>W</td><td class="val-ok" id="st-rf">● STABLE</td></tr>
+            <tr><td>Bias Power (380 kHz)</td><td class="val-sp"><input class="input-cell" id="sp-bias" value="120"></td><td class="val-ok" id="pv-bias">121.0</td><td>W</td><td class="val-ok" id="st-bias">● STABLE</td></tr>
+            <tr><td>Chamber Pressure</td><td class="val-sp"><input class="input-cell" id="sp-press" value="2.50E-3"></td><td class="val-ok" id="press-pv">2.50E-3</td><td>Torr</td><td class="val-ok" id="press-status">● OK</td></tr>
+            <tr><td>CF4 Gas Flow</td><td class="val-sp"><input class="input-cell" id="sp-cf4" value="80.0"></td><td class="val-ok" id="pv-cf4">80.1</td><td>sccm</td><td class="val-ok" id="st-cf4">● OK</td></tr>
+            <tr><td>O2 Gas Flow</td><td class="val-sp"><input class="input-cell" id="sp-o2" value="8.0"></td><td class="val-ok" id="pv-o2">8.0</td><td>sccm</td><td class="val-ok" id="st-o2">● OK</td></tr>
+            <tr><td>Ar Gas Flow</td><td class="val-sp"><input class="input-cell" id="sp-ar" value="20.0"></td><td class="val-ok" id="pv-ar">20.2</td><td>sccm</td><td class="val-ok" id="st-ar">● OK</td></tr>
+            <tr><td>ESC Temperature</td><td class="val-sp"><input class="input-cell" id="sp-esc" value="20.0"></td><td class="val-ok" id="pv-esc">20.1</td><td>°C</td><td class="val-ok" id="st-esc">● OK</td></tr>
+            <tr><td>He Backside Pressure</td><td class="val-sp"><input class="input-cell" id="sp-he" value="8.0"></td><td class="val-ok" id="pv-he">7.9</td><td>Torr</td><td class="val-ok" id="st-he">● OK</td></tr>
+            <tr><td>Throttle Valve Position</td><td class="val-sp"><input class="input-cell" id="sp-throt" value="72.0"></td><td class="val-ok" id="pv-throt">71.8</td><td>%</td><td class="val-ok" id="st-throt">● OK</td></tr>
+            <tr><td>TMP-1 Speed</td><td class="val-sp"><input class="input-cell" id="sp-tmp" value="30000"></td><td class="val-ok" id="tmp-pv">30,120</td><td>RPM</td><td class="val-ok" id="tmp-status">● OK</td></tr>
+            <tr><td>RF Reflect Power</td><td class="val-sp"><input class="input-cell" value="&lt;10"></td><td class="val-ok" id="pv-refl">3.2</td><td>W</td><td class="val-ok" id="st-refl">● OK</td></tr>
+            <tr><td>DC Bias Voltage</td><td class="val-sp"><input class="input-cell" value="--"></td><td class="val-ok" id="pv-bias-v">-186</td><td>V</td><td class="val-ok" id="st-bias-v">● OK</td></tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top:6px;font-size:9px;color:#666;">
+          * SP = Setpoint &nbsp;|&nbsp; PV = Process Value &nbsp;|&nbsp; All values nominal unless flagged
+        </div>
+      </div>
+
+      <!-- Log area -->
+      <div id="log-area">
+        <div class="log-entry log-info">[08:30:00] SYSTEM READY — NEXUS-E320 SN:E320-2204-007</div>
+        <div class="log-entry log-info">[08:30:12] RECIPE CF4_SiO2_HDP_v3 loaded, 7 steps</div>
+        <div class="log-entry log-info">[08:30:18] Wafer transfer complete — slot 03, LOT N22AETX0421</div>
+        <div class="log-entry log-info">[08:30:25] ESC clamped, He backside ON — 7.9 Torr</div>
+        <div class="log-entry log-info">[08:30:30] All pre-checks PASS — ready to run</div>
+      </div>
+    </div>
+
+    <!-- Right panel: status -->
+    <div id="right-panel">
+      <div class="panel-title">SYSTEM STATUS</div>
+
+      <div class="status-section">
+        <div class="status-label">EQUIPMENT STATE</div>
+        <div class="led-row"><div class="led green" id="led-main-power"></div>MAIN POWER</div>
+        <div class="led-row"><div class="led green" id="led-safety"></div>SAFETY INTERLOCK</div>
+        <div class="led-row"><div class="led green" id="led-chamber"></div>CHAMBER SEALED</div>
+        <div class="led-row"><div class="led green" id="plasma-led"></div><span id="plasma-label">PLASMA READY</span></div>
+        <div class="led-row"><div class="led green" id="tmp-led"></div><span id="tmp-label">TMP-1 NOMINAL</span></div>
+        <div class="led-row"><div class="led off" id="led-gas-purge"></div>GAS PURGE</div>
+        <div class="led-row"><div class="led green" id="led-esc"></div>ESC ACTIVE</div>
+      </div>
+
+      <div class="status-section">
+        <div class="status-label">ACTIVE ALARMS</div>
+        <div id="alarm-list" style="font-size:9px;color:#008800;padding:2px;">
+          <div>✓ NO ACTIVE ALARMS</div>
+        </div>
+      </div>
+
+      <div class="status-section">
+        <div class="status-label">PROCESS CONTROL</div>
+        <button class="action-btn success" id="run-btn" onclick="runProcess()">▶ RUN PROCESS</button>
+        <button class="action-btn">⏸ HOLD STEP</button>
+        <button class="action-btn">⏭ SKIP STEP</button>
+        <button class="action-btn danger">■ ABORT</button>
+        <button class="action-btn primary">⚙ TUNE RF</button>
+        <button class="action-btn">🔧 MAINT MODE</button>
+      </div>
+
+      <div class="status-section" style="flex:1;">
+        <div class="status-label">WAFER INFO</div>
+        <div style="font-size:9px;color:#000;line-height:16px;padding:2px;">
+          SLOT: 03 / 25<br>
+          LOT ID: N22AETX0421<br>
+          DEVICE: SiO2_HDP<br>
+          NODE: 28nm<br>
+          TARGET: 1200Å<br>
+          STEP: 3/7<br>
+          WAFER SN: W-0421-C03
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bottom status bar -->
+  <div id="status-bar">
+    <div class="status-cell" id="sb-process">PROCESS: IDLE</div>
+    <div class="status-cell" id="sb-alarm">ALARM: NONE</div>
+    <div class="status-cell">OPERATOR: LIN_JH</div>
+    <div class="status-cell">MODE: AUTO</div>
+    <div class="status-cell" style="flex:1;">NEXUS-E320 SN:E320-2204-007 &nbsp;|&nbsp; HMI v4.2.1 &nbsp;|&nbsp; PLC: ONLINE</div>
+  </div>
+</div>
+
+<!-- ===========================
+     ALARM POPUP
+=========================== -->
+<div id="alarm-popup">
+  <div class="alarm-title-bar">
+    <span>⚠ SYSTEM ALARM — NEXUS-E320</span>
+    <span style="font-size:10px;">PROCESS ABORTED</span>
+  </div>
+  <div class="alarm-body">
+    <div class="alarm-code-row">ALARM CODE: E-2015 &nbsp;&nbsp; CRITICAL</div>
+    <div class="alarm-info">
+      <b>Description:</b> TURBOMOLECULAR PUMP SPEED OUT OF RANGE<br>
+      <b>Module:</b> TMP-1 (Osaka TG2200ML)<br>
+      <b>Trigger:</b> Speed dropped below 25,000 RPM threshold during process<br>
+      <b>Measured:</b> 21,340 RPM &nbsp;&nbsp;&nbsp; <b>Setpoint:</b> 30,000 RPM<br>
+      <b>Process:</b> CF4_SiO2_HDP_v3 Step 3 — ABORTED at t=222s
+    </div>
+    <div class="alarm-btn-row">
+      <button class="alarm-btn" onclick="closeAlarm()">ABORT</button>
+      <button class="alarm-btn" onclick="closeAlarm()">VIEW LOG</button>
+      <button class="alarm-btn ai-assist" id="ai-assist-btn" onclick="startAgentAssist()">🤖 AI AGENT ASSIST</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay -->
+<div id="overlay"></div>
+
+<!-- ===========================
+     AGENT FAB BUTTON
+=========================== -->
+<button id="agent-fab" onclick="toggleAgentPanel()" title="AI Agent — NEXUS Assist">
+  <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8">
+    <circle cx="12" cy="8" r="4"/>
+    <path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
+    <path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke-width="1.2" opacity="0.6"/>
+  </svg>
+  <div id="fab-badge" style="display:none;">!</div>
+</button>
+
+<!-- ===========================
+     AGENT CHAT PANEL
+=========================== -->
+<div id="agent-panel">
+  <div id="panel-header">
+    <div class="agent-avatar">N</div>
+    <div class="agent-info">
+      <div class="agent-name">NEXUS AI Agent</div>
+      <div class="agent-status" id="agent-status-text">在线 · 随时可用</div>
+    </div>
+    <button class="close-btn" onclick="toggleAgentPanel()">✕</button>
+  </div>
+  <div class="running-line" id="running-line" style="display:none;"></div>
+
+  <div id="messages">
+    <div class="msg-bubble system-bubble">
+      🤖 NEXUS AI Agent 已就绪<br>
+      <span style="font-size:10px;opacity:0.7;">知识库已加载 · NEXUS-E320 操作手册 v2.1</span>
+    </div>
+  </div>
+
+  <div id="input-area">
+    <input type="text" id="chat-input" placeholder="输入问题或指令…" onkeydown="if(event.key==='Enter')sendUserMsg()">
+    <button id="send-btn" onclick="sendUserMsg()">
+      <svg viewBox="0 0 24 24" fill="white"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+// =====================
+// Clock
+// =====================
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleDateString('zh-CN') + ' ' +
+    now.toTimeString().slice(0,8);
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Elapsed time counter — only runs when process is running
+let elapsedSec = 0;
+let elapsedTimer = null;
+function secToHMS(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+}
+function startElapsed() {
+  elapsedSec = 0;
+  clearInterval(elapsedTimer);
+  elapsedTimer = setInterval(() => {
+    elapsedSec++;
+    const el = document.getElementById('step-time');
+    if (el) el.textContent = secToHMS(elapsedSec);
+  }, 1000);
+}
+function stopElapsed() { clearInterval(elapsedTimer); }
+
+// =====================
+// Always-on Equipment LED flash
+// =====================
+(function startEquipLedFlash() {
+  const allLeds = [
+    { id: 'led-main-power',   baseClass: 'led green' },
+    { id: 'led-safety',       baseClass: 'led green' },
+    { id: 'led-chamber',      baseClass: 'led green' },
+    { id: 'led-gas-purge',    baseClass: 'led off'   },
+    { id: 'led-esc',          baseClass: 'led green' },
+  ];
+  let tick = 0;
+  setInterval(() => {
+    tick++;
+    allLeds.forEach((led, i) => {
+      const el = document.getElementById(led.id);
+      if (!el) return;
+      if (led.baseClass === 'led off') return; // don't pulse off LEDs
+      // Each LED pulses at a slightly different phase
+      const bright = (tick + i * 2) % 6 < 3;
+      el.style.boxShadow = bright
+        ? '0 0 6px #00ff00, 0 0 12px #00cc00'
+        : '0 0 2px #00aa00';
+    });
+    // plasma-led flickers independently (handled per state)
+    const plasmaLed = document.getElementById('plasma-led');
+    if (plasmaLed && plasmaLed.classList.contains('blue')) {
+      plasmaLed.style.opacity = tick % 7 === 0 ? '0.65' : '1';
+      plasmaLed.style.boxShadow = tick % 3 === 0 ? '0 0 8px #0088ff' : '0 0 4px #0066cc';
+    }
+    // tmp-led pulse
+    const tmpLed = document.getElementById('tmp-led');
+    if (tmpLed && tmpLed.classList.contains('green')) {
+      tmpLed.style.boxShadow = tick % 2 === 0 ? '0 0 4px #00ff00' : '0 0 10px #00ff00, 0 0 18px #00cc00';
+    }
+  }, 500);
+})();
+
+// =====================
+// Panel toggle
+// =====================
+let panelOpen = false;
+function toggleAgentPanel() {
+  panelOpen = !panelOpen;
+  document.getElementById('agent-panel').classList.toggle('show', panelOpen);
+  document.getElementById('fab-badge').style.display = panelOpen ? 'none' : 'flex';
+}
+
+// =====================
+// RUN PROCESS — main demo flow
+// =====================
+let processRunning = false;
+function runProcess() {
+  if (processRunning) return;
+  processRunning = true;
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = '■ RUNNING...';
+  btn.style.background = '#006600';
+
+  // Status bar: running
+  document.getElementById('sb-process').textContent = 'PROCESS: RUNNING';
+
+  // All LEDs → green / active
+  document.getElementById('plasma-led').className = 'led blue';
+  document.getElementById('plasma-label').textContent = 'PLASMA ON';
+  document.getElementById('tmp-led').className = 'led green';
+  document.getElementById('tmp-label').textContent = 'TMP-1 NOMINAL';
+
+  // Alarm list: clear
+  document.getElementById('alarm-list').innerHTML = '<div style="color:#008800;">✓ NO ACTIVE ALARMS</div>';
+
+  // Start elapsed counter
+  startElapsed();
+
+  // Log entries
+  addLog('▶ PROCESS STARTED — CF4_SiO2_HDP_v3', 'log-info');
+  addLog('RF ON: 13.56MHz 450W — Plasma ignition confirmed', 'log-info');
+  addLog('Step 1: PUMP DOWN — target < 1e-3 Torr', 'log-info');
+
+  setTimeout(() => addLog('Step 2: GAS STAB — CF4 80 sccm / O2 8 sccm / Ar 20 sccm', 'log-info'), 1200);
+  setTimeout(() => addLog('Step 3: CF4 MAIN ETCH — START', 'log-info'), 2500);
+
+  // After 5s — simulate TMP degrading then trigger alarm
+  setTimeout(() => {
+    addLog('WARNING: TMP-1 speed declining — 26,400 RPM', 'log-warn');
+    document.getElementById('tmp-pv').textContent = '26,400';
+    document.getElementById('tmp-status').textContent = '△ DEGRADING';
+    document.getElementById('tmp-status').className = 'val-warn';
+    document.getElementById('tmp-led').className = 'led yellow';
+    document.getElementById('tmp-label').textContent = 'TMP-1 SPEED LOW';
+  }, 3500);
+
+  setTimeout(() => {
+    stopElapsed();
+    triggerAlarm();
+  }, 5000);
+}
+
+// =====================
+// Alarm
+// =====================
+let alarmActive = false;
+function triggerAlarm() {
+  alarmActive = true;
+  processRunning = false;
+
+  // Update TMP row to critical
+  document.getElementById('tmp-pv').textContent = '21,340';
+  document.getElementById('tmp-status').textContent = '✕ CRITICAL';
+  document.getElementById('tmp-status').className = 'val-err';
+  document.getElementById('tmp-led').className = 'led red';
+  document.getElementById('tmp-label').textContent = 'TMP-1 FAULT';
+
+  // Status bar
+  document.getElementById('sb-process').textContent = 'PROCESS: ABORTED';
+  document.getElementById('sb-alarm').textContent = 'ALARM: E-2015 CRITICAL';
+  document.getElementById('sb-alarm').style.color = '#cc0000';
+
+  // Alarm list
+  document.getElementById('alarm-list').innerHTML = '<div style="color:#cc0000;font-weight:bold;">E-2015: TMP SPD FAULT</div>';
+
+  // Plasma LED off
+  document.getElementById('plasma-led').className = 'led off';
+  document.getElementById('plasma-label').textContent = 'PLASMA OFF';
+
+  // FAB flash
+  document.getElementById('agent-fab').classList.add('alarm-flash');
+  document.getElementById('fab-badge').style.display = 'flex';
+
+  // Show popup
+  document.getElementById('alarm-popup').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+
+  addLog('CRITICAL E-2015: TMP-1 speed 21,340 RPM — PROCESS ABORTED', 'log-err');
+}
+function closeAlarm() {
+  document.getElementById('alarm-popup').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+function addLog(txt, cls) {
+  const now = new Date();
+  const t = now.toTimeString().slice(0,8);
+  const el = document.createElement('div');
+  el.className = 'log-entry ' + cls;
+  el.textContent = `[${t}] ${txt}`;
+  const log = document.getElementById('log-area');
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+// =====================
+// Messaging helpers
+// =====================
+const messagesEl = document.getElementById('messages');
+
+function scrollBottom() {
+  setTimeout(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }, 50);
+}
+
+function addSystemMsg(text) {
+  const div = document.createElement('div');
+  div.className = 'msg-bubble system-bubble';
+  div.innerHTML = text;
+  messagesEl.appendChild(div);
+  scrollBottom();
+}
+
+function addAgentMsg(text, extra) {
+  const now = new Date().toTimeString().slice(0,5);
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+  row.innerHTML = `
+    <div class="msg-avatar agent">N</div>
+    <div class="msg-content">
+      <div class="msg-meta">NEXUS Agent &nbsp; ${now}</div>
+      <div class="msg-bubble agent-bubble">${text}${extra||''}</div>
+    </div>`;
+  messagesEl.appendChild(row);
+  scrollBottom();
+  return row;
+}
+
+function addUserMsg(text) {
+  const now = new Date().toTimeString().slice(0,5);
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.innerHTML = `
+    <div class="msg-avatar user-av">林</div>
+    <div class="msg-content">
+      <div class="msg-meta">${now} &nbsp; LIN_JH</div>
+      <div class="msg-bubble user-bubble">${text}</div>
+    </div>`;
+  messagesEl.appendChild(row);
+  scrollBottom();
+}
+
+function addThinkMsg(thinking) {
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+  row.innerHTML = `
+    <div class="msg-avatar agent">N</div>
+    <div class="msg-content">
+      <div class="msg-bubble think-bubble">
+        <div class="think-header" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.think-toggle').textContent=this.nextElementSibling.classList.contains('open')?'▾':'▸'">
+          <span class="think-toggle">▸</span> 💭 思考过程
+        </div>
+        <div class="think-body">${thinking}</div>
+      </div>
+    </div>`;
+  messagesEl.appendChild(row);
+  scrollBottom();
+}
+
+function addActionMsg(action) {
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+  row.innerHTML = `
+    <div class="msg-avatar agent">N</div>
+    <div class="msg-content">
+      <div class="msg-bubble action-bubble">⚡ ${action}</div>
+    </div>`;
+  messagesEl.appendChild(row);
+  scrollBottom();
+}
+
+function addScreenshotMsg(imgData, label) {
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+  const now = new Date().toTimeString().slice(0,8);
+  row.innerHTML = `
+    <div class="msg-avatar agent">N</div>
+    <div class="msg-content">
+      <div class="msg-bubble screenshot-bubble">
+        <img src="${imgData}" alt="screenshot"/>
+        <div class="screenshot-label">📷 ${label} · ${now}</div>
+      </div>
+    </div>`;
+  messagesEl.appendChild(row);
+  scrollBottom();
+}
+
+function addTyping() {
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+  row.id = 'typing-row';
+  row.innerHTML = `
+    <div class="msg-avatar agent">N</div>
+    <div class="msg-content">
+      <div class="msg-bubble agent-bubble">
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>
+    </div>`;
+  messagesEl.appendChild(row);
+  scrollBottom();
+  return row;
+}
+function removeTyping() {
+  const el = document.getElementById('typing-row');
+  if (el) el.remove();
+}
+
+function setRunning(on) {
+  document.getElementById('running-line').style.display = on ? 'block' : 'none';
+  document.getElementById('agent-status-text').textContent = on ? '处理中…' : '在线 · 随时可用';
+}
+
+// =====================
+// Take screenshot
+// =====================
+async function takeScreenshot(label) {
+  try {
+    const canvas = await html2canvas(document.getElementById('hmi-root'), {
+      scale: 0.6,
+      useCORS: true,
+      backgroundColor: '#1a1a1a',
+      logging: false,
+      ignoreElements: (el) => el.id === 'agent-panel' || el.id === 'agent-fab' || el.id === 'overlay' || el.id === 'alarm-popup'
+    });
+    const imgData = canvas.toDataURL('image/jpeg', 0.7);
+    addScreenshotMsg(imgData, label || '截图');
+    return imgData;
+  } catch(e) {
+    addActionMsg('截图失败，使用模拟截图代替');
+    return null;
+  }
+}
+
+// =====================
+// AI Agent Assist flow
+// =====================
+async function startAgentAssist() {
+  closeAlarm();
+  document.getElementById('agent-fab').classList.remove('alarm-flash');
+
+  if (!panelOpen) {
+    panelOpen = true;
+    document.getElementById('agent-panel').classList.add('show');
+  }
+
+  setRunning(true);
+
+  await delay(400);
+  addSystemMsg('⚠️ 检测到严重报警 <b>E-2015</b> — AI Agent 已自动激活');
+
+  await delay(800);
+  addActionMsg('正在截取当前HMI界面状态…');
+  await delay(600);
+  await takeScreenshot('报警触发时HMI状态');
+
+  await delay(700);
+  addThinkMsg(`分析报警码 E-2015：TMP-1 转速超出范围<br>
+    测量值：21,340 RPM | 设定值：30,000 RPM | 阈值：25,000 RPM<br>
+    当前进程：CF4_SiO2_HDP_v3 Step 3，已在 t=222s 时中止<br>
+    关键字：turbomolecular pump, speed fault, E-2015<br>
+    → 检索知识库：NEXUS-E320 故障排查手册 Rev.2.1`);
+
+  await delay(1000);
+  const typRow = addTyping();
+  await delay(1500);
+  typRow.remove();
+
+  addAgentMsg(`📚 <b>知识库检索结果</b><br><br>
+    匹配文档：<em>故障排查手册 §4.3 — 涡轮分子泵故障处理</em><br><br>
+    <b>E-2015 根因分析（置信度 94%）：</b><br>
+    TMP 控制器因检测到速度下降触发保护中止。常见根因：<br>
+    ① 气镇阀未完全关闭导致前级压力反冲<br>
+    ② TMP 控制器 TMPC 通信超时<br>
+    ③ 轴承润滑异常（需对照维护记录排查）<br><br>
+    <b>推荐处理步骤：</b>
+    <ol class="step-list">
+      <li><span class="step-num">1</span>确认前级压力 &lt; 5 Torr，检查 V3/V4 阀状态</li>
+      <li><span class="step-num">2</span>进入 Diagnostics → TMP Control，确认 TMPC 通信状态</li>
+      <li><span class="step-num">3</span>执行 TMP 重启序列：Stop → Cool Down 60s → Restart</li>
+      <li><span class="step-num">4</span>等待转速恢复 &gt; 29,000 RPM 后清除报警</li>
+      <li><span class="step-num">5</span>从 Step 3 重新运行工艺（晶圆未损伤）</li>
+    </ol>`,
+    `<button class="confirm-btn" onclick="executeAgentSteps(this)">✅ 确认执行 — Agent 自动操控</button>`
+  );
+
+  setRunning(false);
+}
+
+async function executeAgentSteps(btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳ 执行中…';
+  setRunning(true);
+
+  addUserMsg('确认执行，由 Agent 自动操控');
+
+  await delay(600);
+  addSystemMsg('🤖 Agent 开始自动操控序列 — 请勿手动操作设备');
+
+  // Step 1: Check pressure
+  await delay(500);
+  addThinkMsg('Step 1：需要检查前级压力和阀门状态。当前显示前级 3.8 Torr < 5 Torr — 正常。V3/V4 显示 OPEN — 正常。无需调整。');
+  await delay(400);
+  addActionMsg('VERIFY: 前级压力 3.8 Torr ✓ | V3: OPEN ✓ | V4: OPEN ✓ — 前级状态正常');
+
+  // Step 2: Navigate to Diagnostics
+  await delay(800);
+  addThinkMsg('Step 2：需要导航至 Diagnostics → TMP Control 页面以检查 TMPC 通信状态。点击菜单栏 "Diagnostics"。');
+  await delay(500);
+  addActionMsg('ACTION: 点击 [Diagnostics] 菜单 → 子菜单 [TMP Control Panel]');
+  await delay(600);
+  await takeScreenshot('导航至 Diagnostics TMP Control');
+
+  await delay(700);
+  addActionMsg('READ: TMPC状态 — 通信超时 x3，驱动器轻微降频保护 — 确认根因②');
+
+  // Step 3: Execute restart
+  await delay(800);
+  addThinkMsg('Step 3：执行TMP重启序列。根据手册§4.3.2，顺序：① 点击 STOP ② 等待60秒冷却 ③ 点击 RESTART。执行中…');
+  await delay(500);
+  addActionMsg('ACTION: TMP-1 → 点击 [STOP PUMP]');
+  await delay(2000);
+  addActionMsg('WAIT: 等待 TMP 减速… 当前转速: 18,220 RPM → 12,400 RPM → 5,800 RPM → STOP');
+  await delay(1500);
+  addActionMsg('ACTION: 冷却等待 60 秒…');
+
+  // Simulate cooling countdown
+  for (let i = 60; i > 0; i -= 15) {
+    await delay(500);
+    addActionMsg(`WAIT: 冷却倒计时 ${i}s…`);
+  }
+  await delay(500);
+
+  addActionMsg('ACTION: TMP-1 → 点击 [START PUMP]');
+  await delay(800);
+  await takeScreenshot('TMP 重启序列执行后状态');
+
+  await delay(700);
+  addActionMsg('MONITOR: TMP-1 升速中… 8,200 → 15,600 → 22,100 → 27,400 → 29,850 RPM');
+  await delay(1000);
+
+  // Step 4: Speed recovered
+  addThinkMsg('转速已恢复至 29,850 RPM，超过 29,000 RPM 阈值。可以清除报警并恢复工艺。');
+  await delay(600);
+  addActionMsg('VERIFY: TMP-1 转速 29,850 RPM ✓ — 超过恢复阈值 29,000 RPM');
+
+  // Step 5: Clear alarm and resume
+  await delay(700);
+  addActionMsg('ACTION: Alarm Manager → 选中 E-2015 → 点击 [CLEAR ALARM]');
+
+  // Update HMI state
+  document.getElementById('tmp-status').textContent = '● RECOVERED';
+  document.getElementById('tmp-status').className = 'val-ok';
+  document.getElementById('tmp-led').className = 'led green';
+  document.getElementById('tmp-label').textContent = 'TMP-1 NOMINAL';
+  document.getElementById('alarm-list').innerHTML = '<div style="color:#008800;font-size:9px;">✓ NO ACTIVE ALARMS</div>';
+
+  addLog('E-2015 CLEARED — TMP-1 speed nominal 29850 RPM', 'log-info');
+  addLog('Agent automated recovery sequence completed', 'log-info');
+
+  await delay(500);
+  await takeScreenshot('报警已清除 — HMI 恢复正常');
+
+  await delay(600);
+
+  const typRow2 = addTyping();
+  await delay(1200);
+  typRow2.remove();
+
+  addAgentMsg(`✅ <b>自动恢复完成</b><br><br>
+    <b>操作摘要：</b><br>
+    · E-2015 根因：TMPC 通信超时导致 TMP-1 降频保护<br>
+    · 执行：TMP 重启序列（Stop → Cool 60s → Restart）<br>
+    · 结果：TMP-1 转速已恢复至 29,850 RPM<br>
+    · 报警已清除，设备状态正常<br><br>
+    <b>建议后续操作：</b><br>
+    当前晶圆未损伤（CF4主刻蚀已完成 74%），可从 Step 3 t=222s 断点重新启动工艺。<br><br>
+    是否要立即恢复工艺运行？`);
+
+  setRunning(false);
+  document.getElementById('agent-fab').classList.remove('alarm-flash');
+  document.getElementById('fab-badge').style.display = 'none';
+}
+
+// =====================
+// LIVE PROCESS — continuous PV fluctuation + diagram + LED animation
+// =====================
+let liveProcessTimer = null;
+let liveLogTimer = null;
+let liveDiagramTimer = null;
+
+function startLiveProcess() {
+  // 1. Status bar → RUNNING
+  document.getElementById('sb-process').textContent = 'PROCESS: RUNNING';
+  document.getElementById('sb-alarm').textContent = 'ALARM: NONE';
+  document.getElementById('sb-alarm').style.color = '';
+
+  // 2. Alarm list clear
+  document.getElementById('alarm-list').innerHTML = '<div style="color:#008800;font-size:9px;">✓ NO ACTIVE ALARMS</div>';
+
+  // 3. Equipment State LEDs all green
+  document.getElementById('plasma-led').className = 'led blue';
+  document.getElementById('plasma-label').textContent = 'PLASMA ON';
+  document.getElementById('tmp-led').className = 'led green';
+  document.getElementById('tmp-label').textContent = 'TMP-1 NOMINAL';
+
+  // 4. Chamber status
+  document.getElementById('chamber-status').textContent = 'OPERATING';
+  document.getElementById('chamber-status').style.color = '#00ff00';
+
+  // 5. Resume elapsed from 222s, drive step-time display
+  elapsedSec = 222;
+  clearInterval(elapsedTimer);
+  elapsedTimer = setInterval(() => {
+    elapsedSec++;
+    const el = document.getElementById('step-time');
+    if (el) el.textContent = secToHMS(elapsedSec);
+    if (elapsedSec >= 300) {
+      clearInterval(elapsedTimer);
+      addLog('Step 3: CF4 MAIN ETCH — COMPLETE (300s)', 'log-info');
+      addLog('Step 4: O2 CLEAN — START', 'log-info');
+    }
+  }, 1000);
+
+  // 6. PV fluctuation — one row updates per tick, cycling through all rows
+  const pvDefs = [
+    { pvId: 'pv-rf',     stId: 'st-rf',       sp: 450,    fmt: v => v.toFixed(1),                              label: '● STABLE' },
+    { pvId: 'pv-bias',   stId: 'st-bias',      sp: 120,    fmt: v => v.toFixed(1),                              label: '● STABLE' },
+    { pvId: 'press-pv',  stId: 'press-status', sp: 0.0025, fmt: v => v.toExponential(2).toUpperCase(),          label: '● OK'     },
+    { pvId: 'pv-cf4',    stId: 'st-cf4',       sp: 80.0,   fmt: v => v.toFixed(1),                              label: '● OK'     },
+    { pvId: 'pv-o2',     stId: 'st-o2',        sp: 8.0,    fmt: v => v.toFixed(2),                              label: '● OK'     },
+    { pvId: 'pv-ar',     stId: 'st-ar',        sp: 20.0,   fmt: v => v.toFixed(1),                              label: '● OK'     },
+    { pvId: 'pv-esc',    stId: 'st-esc',       sp: 20.0,   fmt: v => v.toFixed(1),                              label: '● OK'     },
+    { pvId: 'pv-he',     stId: 'st-he',        sp: 8.0,    fmt: v => v.toFixed(1),                              label: '● OK'     },
+    { pvId: 'pv-throt',  stId: 'st-throt',     sp: 72.0,   fmt: v => v.toFixed(1),                              label: '● OK'     },
+    { pvId: 'tmp-pv',    stId: 'tmp-status',   sp: 30000,  fmt: v => Math.round(v).toLocaleString(),            label: '● OK'     },
+    { pvId: 'pv-refl',   stId: 'st-refl',      sp: 5,      fmt: v => v.toFixed(1),                              label: '● OK'     },
+    { pvId: 'pv-bias-v', stId: 'st-bias-v',    sp: -186,   fmt: v => v.toFixed(0),                              label: '● OK'     },
+  ];
+
+  let pvIdx = 0;
+  liveProcessTimer = setInterval(() => {
+    // Update exactly ONE row per tick
+    const def = pvDefs[pvIdx % pvDefs.length];
+    pvIdx++;
+
+    const el = document.getElementById(def.pvId);
+    const st = document.getElementById(def.stId);
+    if (!el) return;
+
+    const jitter = Math.random() * 0.06 - 0.03; // ±3%
+    const val = def.sp * (1 + jitter);
+    el.textContent = def.fmt(val);
+    el.className = 'val-ok';
+    if (st) { st.textContent = def.label; st.className = 'val-ok'; }
+
+    // Also update the matching diagram label when relevant rows fire
+    if (def.pvId === 'press-pv') {
+      const v = (0.0025 * (1 + jitter)).toExponential(1);
+      document.getElementById('diag-press').textContent = v + ' Torr';
+    } else if (def.pvId === 'pv-rf') {
+      document.getElementById('diag-rf').textContent = Math.round(val) + ' W';
+    } else if (def.pvId === 'pv-esc') {
+      document.getElementById('diag-esc').textContent = val.toFixed(1) + ' °C';
+    }
+  }, 600);
+
+  // 7. Diagram flash — pipes and sensor dots pulse
+  const pipes    = ['gas-manifold', 'pump-pipe-main', 'pump-pipe-h'];
+  const sensors  = ['sensor-press', 'sensor-temp'];
+  const mfcs     = ['mfc-cf4', 'mfc-o2', 'mfc-ar'];
+  const pipeColors = ['#00ffff','#00dddd','#00bbbb'];
+  const mfcBrightness = ['#0055ff','#005500','#550055'];
+
+  let diagTick = 0;
+  liveDiagramTimer = setInterval(() => {
+    diagTick++;
+
+    // Chamber box border pulses between cyan and bright green
+    const chamber = document.getElementById('chamber-box');
+    if (chamber) {
+      chamber.style.borderColor = diagTick % 2 === 0 ? '#00ffff' : '#00ff88';
+      chamber.style.boxShadow   = diagTick % 2 === 0 ? '0 0 6px #00ffff' : '0 0 10px #00ff88';
+    }
+
+    // TMP pump box blinks
+    const tmpPump = document.getElementById('tmp-pump-box');
+    if (tmpPump) {
+      tmpPump.style.borderColor = diagTick % 2 === 0 ? '#ff00ff' : '#ffaaff';
+    }
+
+    // Manifold pipe color pulse
+    const manifold = document.getElementById('gas-manifold');
+    if (manifold) {
+      manifold.style.background = pipeColors[diagTick % pipeColors.length];
+    }
+
+    // Sensor dots pulse opacity
+    sensors.forEach((id, i) => {
+      const s = document.getElementById(id);
+      if (s) s.style.opacity = (diagTick + i) % 2 === 0 ? '1' : '0.4';
+    });
+
+    // MFC boxes subtle brightness shift
+    mfcs.forEach((id, i) => {
+      const m = document.getElementById(id);
+      if (m) {
+        m.style.background = (diagTick + i) % 3 === 0 ? mfcBrightness[i] : '';
+      }
+    });
+
+    // V1 valve text blinks OPEN/ACTV alternately
+    const v1 = document.getElementById('v1-box');
+    if (v1) v1.innerHTML = diagTick % 4 < 2 ? 'V1<br>OPEN' : 'V1<br>ACTV';
+
+  }, 800);
+
+  // 9. Continuous log entries
+  const liveLogs = [
+    ['Step 3 resumed from t=222s — CF4 MAIN ETCH continuing', 'log-info'],
+    ['RF Power stable: 449.2W / Bias: 121.0W', 'log-info'],
+    ['Chamber pressure nominal: 2.50E-3 Torr', 'log-info'],
+    ['TMP-1 speed stable: 29,850 RPM', 'log-info'],
+    ['Gas flows nominal — CF4:80.1 O2:8.0 Ar:20.2 sccm', 'log-info'],
+    ['Etch rate estimate: 1,840 Å/min — on target', 'log-info'],
+    ['DC Bias: -186V stable — ESC clamping OK', 'log-info'],
+    ['Step 3 t=240s — 80% complete', 'log-info'],
+    ['He backside pressure: 7.9 Torr — OK', 'log-info'],
+    ['RF reflect power: 3.2W — match network stable', 'log-info'],
+    ['Step 3 t=270s — 90% complete', 'log-info'],
+    ['Endpoint signal monitoring active', 'log-info'],
+    ['Step 3 t=300s — COMPLETE', 'log-info'],
+    ['Transitioning to Step 4: O2 CLEAN', 'log-info'],
+    ['O2 flow: 50 sccm — RF 200W — 30s', 'log-info'],
+    ['Step 4 complete — Step 5: PURGE', 'log-info'],
+    ['N2 purge 60 sccm — 20s', 'log-info'],
+    ['Step 5 complete — RF OFF', 'log-info'],
+    ['Plasma extinguished — He backside venting', 'log-info'],
+    ['ESC release sequence initiated', 'log-info'],
+    ['Wafer de-clamped — transfer robot ready', 'log-info'],
+    ['LOT N22AETX0421 Slot 03 — PROCESS COMPLETE ✓', 'log-info'],
+  ];
+  let logIdx = 0;
+  liveLogTimer = setInterval(() => {
+    if (logIdx < liveLogs.length) {
+      addLog(liveLogs[logIdx][0], liveLogs[logIdx][1]);
+      logIdx++;
+    } else {
+      clearInterval(liveLogTimer);
+    }
+  }, 2000);
+}
+
+// =====================
+// User chat
+// =====================
+const knowledgeBase = {
+  'rf': '**RF电源调谐**：当反射功率 >10W 时，进入 Process Control → Tune RF，点击 Auto-Tune 等待约 15 秒。手动调谐：调整 C1 Capacitor (匹配) 使反射功率最小化。',
+  'pressure': '**腔室压力控制**：通过节气阀（Throttle Valve）调节。压力偏低 → 节气阀开度减小；偏高 → 节气阀开度增大。自动模式下 PLC 自动调节，响应时间约 2-5 秒。',
+  'tmp': '**TMP（涡轮分子泵）故障处理**：E-2015 为 TMP 转速超范围，参考 §4.3。重启步骤：STOP → 冷却60s → RESTART → 等待恢复 >29,000 RPM。',
+  'esc': '**ESC（静电吸盘）操作**：夹持前确认 He 背压 7-9 Torr。释放流程：RF OFF → 等待 10s → ESC Unclamp → He OFF → 晶圆传出。',
+  'gas': '**气体流量调节**：MFC 流量通过 Process Parameters 表格中 SP 列输入修改，修改后点击 Apply。建议每次调整幅度不超过 ±10%。',
+  'recipe': '**配方管理**：Recipe Editor 标签页可编辑步骤参数。修改前需先 Lock Recipe 解锁，修改后 Save As 新版本。生产配方需工程师级别权限。',
+  '帮助': '我可以帮助您处理 NEXUS-E320 相关问题：设备报警处理、工艺参数调整、配方操作、预防性维护等。请描述您遇到的具体问题。',
+};
+
+async function sendUserMsg() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  addUserMsg(text);
+
+  const lower = text.toLowerCase();
+
+  // "立即恢复" / "恢复" / "resume" → trigger live process
+  if (lower.includes('立即恢复') || lower.includes('恢复工艺') || lower.includes('resume') || text === '立即恢复') {
+    setRunning(true);
+    const typRow = addTyping();
+    await delay(900);
+    typRow.remove();
+
+    addAgentMsg(`⚙️ 正在恢复工艺运行…<br><br>
+      · 从 Step 3 t=222s 断点重新启动<br>
+      · RF ON → 等待等离子点火<br>
+      · 气体流量稳定后继续刻蚀`);
+
+    await delay(800);
+    addActionMsg('ACTION: Process Control → Resume Step 3 from t=222s');
+    await delay(600);
+    addActionMsg('VERIFY: RF ON 450W ✓ | Plasma ignited ✓ | Gas flows nominal ✓');
+    await delay(500);
+    addSystemMsg('▶ 工艺已恢复运行 — Step 3 CF4 MAIN ETCH 继续');
+
+    startLiveProcess();
+    setRunning(false);
+    return;
+  }
+
+  setRunning(true);
+  const typRow = addTyping();
+  await delay(800 + Math.random() * 600);
+  typRow.remove();
+
+  let response = null;
+  for (const [key, val] of Object.entries(knowledgeBase)) {
+    if (lower.includes(key)) { response = val; break; }
+  }
+  if (!response) {
+    response = `收到您的问题："${text}"<br><br>正在检索 NEXUS-E320 知识库…<br><br>未找到精确匹配条目。建议：<br>· 尝试更具体的关键词（如"TMP"、"RF"、"压力"、"配方"）<br>· 查阅设备手册 §相关章节<br>· 联系现场工程师获取支持<br><br>需要我帮您处理具体的报警或操作步骤吗？`;
+  }
+
+  addAgentMsg(response);
+  setRunning(false);
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
