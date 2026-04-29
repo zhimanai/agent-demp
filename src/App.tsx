@@ -5,7 +5,6 @@ import {
   equipmentState,
   initialLogs,
   initialMessages,
-  knowledgeBase,
   maintenanceItems,
   menuItems,
   processRows,
@@ -14,14 +13,35 @@ import {
   trendCards,
   waferInfo,
 } from './data/mockData';
-import type { ChatMessage, EquipmentStateItem, LogItem, Message, MessageInput, ProcessRow } from './types';
+import { createChatRequest, streamChatCompletion } from './services/chat';
+import type { EquipmentStateItem, LogItem, Message, MessageInput, ProcessRow } from './types';
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function summarizeToolOutput(output: string) {
+  const normalized = output.replace(/^"+|"+$/g, '').trim();
+
+  if (normalized.includes('station_code')) {
+    return '已拿到部分站点编码，正在继续核对目的地可用站点。';
+  }
+
+  if (/city not found/i.test(normalized) || normalized.includes('未检索到')) {
+    return '未找到目标城市的有效站点，正在尝试缩小查询范围。';
+  }
+
+  if (!normalized) {
+    return '工具已返回结果。';
+  }
+
+  return normalized.length > 72 ? `${normalized.slice(0, 72)}...` : normalized;
+}
 
 function App() {
   const hmiRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const logsRef = useRef<HTMLDivElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const messageRequestIdRef = useRef(0);
 
   const [clock, setClock] = useState('');
   const [stepSeconds, setStepSeconds] = useState(0);
@@ -36,6 +56,9 @@ function App() {
   const [chatInput, setChatInput] = useState('');
   const [agentAutoExecuted, setAgentAutoExecuted] = useState(false);
   const [liveLogIndex, setLiveLogIndex] = useState(0);
+  const [conversationId, setConversationId] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [isWaitingFirstToken, setIsWaitingFirstToken] = useState(false);
 
   useEffect(() => {
     const updateClock = () => {
@@ -117,6 +140,25 @@ function App() {
 
   const addMessage = (message: MessageInput) => {
     setMessages((current) => [...current, { id: `${Date.now()}-${Math.random()}`, ...message } as Message]);
+  };
+
+  const updateMessage = (messageId: string, updater: (message: Message) => Message) => {
+    setMessages((current) => current.map((message) => (message.id === messageId ? updater(message) : message)));
+  };
+
+  const formatReplyHtml = (content: string) =>
+    content
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/\n/g, '<br />');
+
+  const stopActiveChatStream = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setChatLoading(false);
+    setIsWaitingFirstToken(false);
+    setAgentRunning(false);
   };
 
   const displayedRows = useMemo<ProcessRow[]>(
@@ -329,6 +371,7 @@ function App() {
     const text = rawText.trim();
     if (!text) return;
 
+    stopActiveChatStream();
     addMessage({ type: 'user', text, author: 'LIN_JH' });
 
     const lower = text.toLowerCase();
@@ -353,17 +396,165 @@ function App() {
       return;
     }
 
-    setAgentRunning(true);
-    await delay(800 + Math.random() * 600);
+    const controller = new AbortController();
+    const requestId = Date.now();
+    const pendingMessageId = `${Date.now()}-${Math.random()}`;
+    const planningMessageId = `${Date.now()}-${Math.random()}-plan`;
+    let planningSeen = false;
 
-    const matched = Object.entries(knowledgeBase).find(([key]) => lower.includes(key));
-    addMessage({
-      type: 'agent',
-      html:
-        matched?.[1] ??
-        `收到请求：“${text}”<br><br>当前未命中精确知识条目。建议尝试更具体的关键词，例如 “TMP”、“RF”、“压力”、“配方”，或直接让系统执行诊断流程。`,
-    });
-    setAgentRunning(false);
+    messageRequestIdRef.current = requestId;
+    abortControllerRef.current = controller;
+    setAgentRunning(true);
+    setChatLoading(true);
+    setIsWaitingFirstToken(true);
+    setMessages((current) => [
+      ...current,
+      {
+        id: planningMessageId,
+        type: 'think',
+        text: '正在调用大模型对话接口，联调中…',
+      } as Message,
+      {
+        id: pendingMessageId,
+        type: 'agent',
+        html: '',
+      } as Message,
+    ]);
+
+    try {
+      const payload = createChatRequest(text, conversationId || undefined);
+      appendLog(`CHAT REQUEST: ${payload.message}`, 'info');
+
+      await streamChatCompletion(
+        payload,
+        {
+          onEvent: (event) => {
+            if (messageRequestIdRef.current !== requestId) {
+              throw new DOMException('aborted', 'AbortError');
+            }
+
+            if (event.type === 'ConversationStarted') {
+              const nextConversationId = String((event.data as { conversation_id?: string }).conversation_id || '');
+              if (nextConversationId) {
+                setConversationId(nextConversationId);
+              }
+              appendLog(`SSE: ConversationStarted ${nextConversationId}`, 'info');
+              return;
+            }
+
+            if (event.type === 'PlanningStarted') {
+              planningSeen = true;
+              updateMessage(planningMessageId, (message) => ({
+                ...message,
+                ...(message.type === 'think' ? { text: '正在理解问题并组织处理步骤…' } : {}),
+              }));
+              return;
+            }
+
+            if (event.type === 'PlanContent') {
+              const content = String((event.data as { content?: string }).content || '');
+              updateMessage(planningMessageId, (message) => ({
+                ...message,
+                ...(message.type === 'think' ? { text: content } : {}),
+              }));
+              return;
+            }
+
+            if (event.type === 'PlanningCompleted') {
+              return;
+            }
+
+            if (event.type === 'ToolExecutionStarted') {
+              const toolName = String((event.data as { tool_name?: string }).tool_name || '');
+              addMessage({
+                type: 'action',
+                text: `正在调用工具 ${toolName}，请稍候…`,
+              });
+              return;
+            }
+
+            if (event.type === 'ToolExecutionCompleted') {
+              const toolName = String((event.data as { tool_name?: string }).tool_name || '');
+              const output = String(
+                ((event.data as { result?: { output?: string } }).result?.output as string | undefined) || '',
+              );
+              addMessage({
+                type: 'action',
+                text: `${toolName} 已完成：${summarizeToolOutput(output)}`,
+              });
+              return;
+            }
+
+            if (event.type === 'ContentChunk') {
+              const chunk = String((event.data as { content?: string }).content || '');
+              if (isWaitingFirstToken) {
+                setIsWaitingFirstToken(false);
+              }
+
+              updateMessage(pendingMessageId, (message) => {
+                if (message.type !== 'agent') return message;
+                const currentText = (message.html || '').replace(/<br \/>/g, '\n');
+                return {
+                  ...message,
+                  html: formatReplyHtml(`${currentText}${chunk}`),
+                };
+              });
+              return;
+            }
+
+            if (event.type === 'ConversationCompleted') {
+              updateMessage(planningMessageId, (message) => ({
+                ...message,
+                ...(message.type === 'think'
+                  ? {
+                      text: planningSeen ? '已完成分析与工具核验。' : '已完成本轮对话处理。',
+                    }
+                  : {}),
+              }));
+              return;
+            }
+
+            if (event.type === 'Error') {
+              const errorMessage = String((event.data as { message?: string }).message || '接口返回异常');
+              throw new Error(errorMessage);
+            }
+          },
+        },
+        controller.signal,
+      );
+    } catch (error) {
+      const isAbortError = error instanceof DOMException && error.name === 'AbortError';
+
+      if (isAbortError) {
+        updateMessage(pendingMessageId, (message) => ({
+          ...message,
+          ...(message.type === 'agent' ? { html: '已停止本次回复生成。' } : {}),
+        }));
+        appendLog('AI chat completion aborted by next request', 'warn');
+        return;
+      }
+
+      appendLog(`AI chat completion failed: ${error instanceof Error ? error.message : 'unknown error'}`, 'err');
+      updateMessage(planningMessageId, (message) => ({
+        ...message,
+        ...(message.type === 'think' ? { text: '当前链路异常，未能完成本轮分析。' } : {}),
+      }));
+      updateMessage(pendingMessageId, (message) => ({
+        ...message,
+        ...(message.type === 'agent'
+          ? {
+              html: '当前接口不可用，已保留本地模拟对话能力。你可以继续提问，我会按大模型流式回复效果继续展示。',
+            }
+          : {}),
+      }));
+    } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
+      setChatLoading(false);
+      setIsWaitingFirstToken(false);
+      setAgentRunning(false);
+    }
   };
 
   const sendUserMsg = async () => {
@@ -857,11 +1048,11 @@ function App() {
             className="chat-input"
             onChange={(event) => setChatInput(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') {
+              if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
                 void sendUserMsg();
               }
             }}
-            placeholder="输入问题、调用 Agent 诊断或生成恢复建议…"
+            placeholder={isWaitingFirstToken ? '大模型正在思考中…' : '输入问题、调用 Agent 诊断或生成恢复建议…'}
             value={chatInput}
           />
           <button className="send-btn" onClick={() => void sendUserMsg()} type="button">
@@ -951,7 +1142,10 @@ function MessageCard({
       <div className={`msg-avatar ${isUser ? 'user-av' : 'agent'}`}>{isUser ? '林' : 'N'}</div>
       <div className="msg-content">
         <div className="msg-meta">{isUser ? `${new Date().toTimeString().slice(0, 5)}  LIN_JH` : `NEXUS Agent  ${new Date().toTimeString().slice(0, 5)}`}</div>
-        <div className={`msg-bubble ${isUser ? 'user-bubble' : 'agent-bubble'}`} dangerouslySetInnerHTML={{ __html: chatMessage.html ?? chatMessage.text ?? '' }} />
+        <div
+          className={`msg-bubble ${isUser ? 'user-bubble' : 'agent-bubble'} ${!isUser && !(chatMessage.html ?? chatMessage.text)?.trim() ? 'streaming-bubble' : ''}`}
+          dangerouslySetInnerHTML={{ __html: chatMessage.html ?? chatMessage.text ?? (!isUser ? '正在生成回复...' : '') }}
+        />
         {chatMessage.confirm ? (
           <button className="confirm-btn" onClick={() => void onConfirm()} type="button">
             确认执行 Agent 自动恢复

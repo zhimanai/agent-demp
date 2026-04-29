@@ -1163,6 +1163,18 @@ input {
   color: #d0e8ff;
 }
 
+.msg-bubble.agent-bubble.streaming-bubble {
+  color: #8fa8bf;
+  position: relative;
+}
+
+.msg-bubble.agent-bubble.streaming-bubble::after {
+  animation: streamCursor 1s steps(1) infinite;
+  color: #38c793;
+  content: '▋';
+  margin-left: 4px;
+}
+
 .msg-bubble.user-bubble {
   background: linear-gradient(135deg, #38c793, #2ea876);
   color: #fff;
@@ -1233,6 +1245,17 @@ input {
   display: flex;
   gap: 8px;
   padding: 3px 0;
+}
+
+@keyframes streamCursor {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.15;
+  }
 }
 
 .step-num {
